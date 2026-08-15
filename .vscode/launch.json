@@ -39,6 +39,36 @@
       "sourceMaps": true
     },
     {
+      "name": "Docker: production image",
+      // Type is "chrome", not "docker": the `docker` launch type comes from the
+      // Docker extension, which is not a dependency of this repo. The container
+      // is started by the preLaunchTask instead, and this config attaches a
+      // browser to it — which is the part you actually debug, since the Python
+      // in the image runs without debugpy.
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8000",
+      "webRoot": "${workspaceFolder}/frontend",
+      // The task is a background task whose problemMatcher completes on
+      // "Application startup complete", so Chrome opens only once migrations,
+      // seeding and uvicorn's bind have all finished. Without that, the first
+      // request races the boot and gets connection refused.
+      "preLaunchTask": "docker: build & run (production image)",
+      // Symmetrical with the full-stack compound's `stopAll`: ending the debug
+      // session tears the container down rather than leaving it running in the
+      // background. The database volume is kept.
+      "postDebugTask": "docker: stop",
+      // The image ships a production Vite build, which emits no source maps —
+      // leaving this on produces a stream of "could not load source map"
+      // warnings and breakpoints that bind to minified output. Debug app logic
+      // with the dev configs above; use this one to verify the built artefact.
+      "sourceMaps": false,
+      "presentation": {
+        "group": "2-docker",
+        "order": 1
+      }
+    },
+    {
       "name": "DB: reset + seed data",
       "type": "debugpy",
       "request": "launch",

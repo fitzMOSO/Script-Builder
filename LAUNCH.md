@@ -15,7 +15,7 @@ the underlying commands by hand.
 | Run the app without debugging | `Ctrl+Shift+P` → *Run Task* → **dev: backend + frontend** |
 | Wipe and reload the campaign data | *Run Task* → **db: reset + seed data** |
 | Add a column / change a model | *Run Task* → **db: new migration**, review, then **db: migrate** |
-| Run exactly what production runs | *Run Task* → **docker: build & run (production image)** |
+| Run exactly what production runs | `F5` → **Docker: production image** |
 
 Ports: backend **8000**, frontend **5173**. The frontend proxies `/api` → `127.0.0.1:8000`,
 so you always browse to <http://localhost:5173>.
@@ -80,11 +80,33 @@ task instead and use your browser's own devtools.
 Use when Vite is *already* running (e.g. you started it as a task) and you just want a
 debugger attached. Does not start the server itself.
 
-### DB: create database / DB: reset + seed data
+### Docker: production image
 
-The two database scripts, run under the debugger rather than as plain tasks. Only useful
-if you're changing the seed data and want to breakpoint through it — otherwise use the
-tasks, which are faster.
+Runs the container instead of the dev servers — the same image Render deploys — and
+opens a browser at <http://localhost:8000>. See
+[Running the production image](#running-the-production-image) for what differs from the
+dev configs.
+
+Mechanically it is a Chrome launch config with `preLaunchTask` and `postDebugTask`
+rather than a `docker` launch type, because the `docker` type comes from the Docker
+extension and this repo does not depend on it. Consequences worth knowing:
+
+- **Startup waits for the container.** The prelaunch task completes on
+  `Application startup complete`, so the browser opens after migrations, seeding and
+  uvicorn's bind — not before.
+- **Ending the session stops the container** (`postDebugTask`), mirroring `stopAll` on
+  the full-stack compound. The database volume survives.
+- **`sourceMaps` is off.** The image ships a production Vite build with no source maps;
+  leaving it on gives you warnings and breakpoints bound to minified output. Debug
+  application logic with the dev configs — use this one to check the built artefact.
+- **The Python is not debuggable here.** The container runs plain uvicorn, not debugpy.
+  For Python breakpoints use **Backend: FastAPI (uvicorn)**.
+
+### DB: reset + seed data
+
+The seed script, run under the debugger rather than as a plain task. Only useful if
+you're changing the seed data and want to breakpoint through it — otherwise use the
+task, which is faster.
 
 ---
 
@@ -94,10 +116,9 @@ tasks, which are faster.
 
 | Task | What it does |
 | --- | --- |
-| `db: bootstrap (create + migrate + seed)` | All three below, in order. Default build task. |
-| `db: create database` | Creates `ScriptBuilder` if absent. Idempotent. |
+| `db: bootstrap (migrate + seed)` | Both of the two below, in order. Default build task. |
 | `db: migrate (upgrade head)` | Applies pending migrations. Idempotent. |
-| `db: reset + seed data` | **Destructive.** Deletes every row, reloads from the docs. |
+| `db: reset + seed data` | **Destructive.** Deletes every row, reloads from `scripts/sample_sets.py`. |
 | `db: new migration (autogenerate)` | Prompts for a message, diffs models vs database. |
 | `db: downgrade one revision` | Rolls back the most recent migration. |
 

@@ -29,7 +29,7 @@
     },
     {
       "label": "db: reset + seed data",
-      "detail": "WIPES all script data and reseeds from the campaign documents. Ids restart at 0.",
+      "detail": "WIPES all script data and reseeds from scripts/sample_sets.py. Ids restart at 1.",
       "type": "shell",
       "command": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
       "args": ["scripts/seed.py"],
