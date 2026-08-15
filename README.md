@@ -13,7 +13,7 @@ Call-centre script authoring tool — build ordered, versioned call scripts with
 | Forms    | React Hook Form + Zod                          |
 | Backend  | Python 3.14 + FastAPI                          |
 | ORM      | SQLAlchemy 2.0                                 |
-| Database | Microsoft SQL Server (pyodbc + ODBC Driver 18) |
+| Database | SQLite (no server to install)                  |
 | Migrations | Alembic                                      |
 | PWA      | vite-plugin-pwa (Workbox `generateSW`)         |
 
@@ -25,33 +25,29 @@ Call-centre script authoring tool — build ordered, versioned call scripts with
 
 - Node.js 20+
 - Python 3.11+
-- SQL Server running locally, and ODBC Driver 18 installed
+
+That is the whole list. The database is SQLite, so there is no server to install,
+no driver to match and no connection string to configure.
 
 ## Setup
 
-### 1. SQL Server
-
-The app targets the **LocalDB** instance (`(localdb)\MSSQLLocalDB`), which starts on
-demand — there is no Windows service to start manually.
-
-> Note: this machine also has a separate default `MSSQLSERVER` instance installed, but it
-> fails to start with error 17051 and is **not** what this project uses.
-
-Verify LocalDB is available with:
-
-```
-sqllocaldb info MSSQLLocalDB
-```
-
-### 2. Backend
+### 1. Backend
 
 ```bash
 cd backend
-.venv/Scripts/python.exe scripts/create_db.py   # creates the ScriptBuilder database
-.venv/Scripts/alembic.exe upgrade head          # creates the tables
-.venv/Scripts/python.exe scripts/seed.py        # wipes and seeds 4 script sets
-.venv/Scripts/uvicorn.exe app.main:app --reload
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe -m alembic upgrade head   # creates backend/scriptbuilder.db
+.venv/Scripts/python.exe scripts/seed.py           # wipes and seeds 3 script sets
+.venv/Scripts/python.exe -m uvicorn app.main:app --reload
 ```
+
+On macOS or Linux the interpreter is `.venv/bin/python` instead.
+
+`alembic upgrade head` creates the database file itself — SQLite has no
+"create database" step, the file appears on first connection. Delete
+`backend/scriptbuilder.db` any time you want to start over; it is gitignored
+and fully rebuilt by those two commands.
 
 API runs at http://127.0.0.1:8000 — interactive docs at http://127.0.0.1:8000/docs
 
@@ -69,10 +65,13 @@ All seed content is invented demo material — no real campaign, client or
 product is represented. Every merge variable is filled in, so the Run screen
 demonstrates substitution out of the box.
 
-Connection settings live in `backend/.env` (see `.env.example`). It defaults to
-`(localdb)\MSSQLLocalDB` with Windows trusted authentication.
+Settings live in `backend/.env` (see `.env.example`), but every one of them has
+a working default — the file is optional. The database defaults to
+`backend/scriptbuilder.db`, resolved relative to the package rather than the
+current working directory, so `alembic` and `uvicorn` always agree on which
+file they are using no matter where you launch them from.
 
-### 3. Frontend
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -136,9 +135,9 @@ script_sets ──< script_steps
 
 Merge variables are written inline as `{{variable_name}}` and extracted from step
 content on read, so there is no separate variables table to keep in sync. Their
-**values** live in `script_sets.variable_values` — a JSON map stored in `NVARCHAR(MAX)`
-(MSSQL has no native JSON type), edited under Settings and substituted by the Run
-screen. Unset variables render as the raw `{{token}}` on an amber highlight so an
+**values** live in `script_sets.variable_values` — a JSON map stored as `TEXT` and
+marshalled by a small SQLAlchemy `TypeDecorator`, so the Python side is always a
+plain dict. Edited under Settings, substituted by the Run screen. Unset variables render as the raw `{{token}}` on an amber highlight so an
 agent can see the gap rather than read the token aloud.
 
 ## API

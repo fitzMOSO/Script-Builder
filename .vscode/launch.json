@@ -39,16 +39,6 @@
       "sourceMaps": true
     },
     {
-      "name": "DB: create database",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/backend/scripts/create_db.py",
-      "cwd": "${workspaceFolder}/backend",
-      "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
-      "console": "integratedTerminal",
-      "justMyCode": false
-    },
-    {
       "name": "DB: reset + seed data",
       "type": "debugpy",
       "request": "launch",

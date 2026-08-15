@@ -9,7 +9,7 @@ Placeholders are written in the app's {{merge_variable}} syntax so the Run
 screen demonstrates substitution.
 
 Running this script WIPES all existing script data and reseeds from scratch,
-reseeding IDENTITY columns so ids start at 1.
+so ids start at 1 again.
 """
 
 import sys
@@ -42,37 +42,36 @@ TABLES_IN_DELETE_ORDER = [
 ]
 
 
-VIRGIN_CHECK = text(
-    """
-    SELECT CASE WHEN last_value IS NULL THEN 1 ELSE 0 END
-    FROM sys.identity_columns
-    WHERE object_id = OBJECT_ID(:table_name)
-    """
-)
-
-
 def reset(db) -> None:
-    """Delete every row and reseed IDENTITY so the first new row gets id 0.
+    """Delete every row so the next insert starts from id 1 again.
 
-    SQL Server's RESEED has two different behaviours, and getting this wrong is
-    why a re-run would otherwise start at 1 instead of 0:
+    An `INTEGER PRIMARY KEY` in SQLite is an alias for the table's rowid, and
+    without the `AUTOINCREMENT` keyword the next rowid is simply `max(rowid)+1`
+    — so clearing the table is all it takes to restart numbering. There is no
+    counter to reset, which is why this needs none of the `DBCC CHECKIDENT`
+    dance SQL Server required.
 
-      * table that has NEVER had a row inserted -> next id = reseed_value
-      * table that HAS had rows                 -> next id = reseed_value + 1
+    `sqlite_sequence` is still swept, defensively: it only exists once some
+    table has been declared AUTOINCREMENT, and a stale row in it would pin ids
+    above 1 for that table. Missing table is fine — nothing declares it today.
 
-    `sys.identity_columns.last_value` is NULL only in the first case, so we use
-    it to pick the right reseed value and land on 0 either way.
+    Ids now start at 1 rather than 0. Nothing keys off a literal id, so this is
+    only visible in URLs.
     """
     for table in TABLES_IN_DELETE_ORDER:
-        db.execute(text(f"DELETE FROM {table}"))
+        db.execute(text(f"DELETE FROM {table}"))  # noqa: S608 - fixed list above
     db.flush()
 
-    for table in TABLES_IN_DELETE_ORDER:
-        is_virgin = db.execute(VIRGIN_CHECK, {"table_name": table}).scalar()
-        reseed_value = 0 if is_virgin else -1
-        db.execute(text(f"DBCC CHECKIDENT ('{table}', RESEED, {reseed_value})"))
+    has_sequence = db.execute(
+        text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'")
+    ).scalar()
+    if has_sequence:
+        for table in TABLES_IN_DELETE_ORDER:
+            db.execute(
+                text("DELETE FROM sqlite_sequence WHERE name = :table"), {"table": table}
+            )
 
-    print(f"reset   cleared {len(TABLES_IN_DELETE_ORDER)} tables, next id will be 0")
+    print(f"reset   cleared {len(TABLES_IN_DELETE_ORDER)} tables, next id will be 1")
 
 
 def build_set(spec: dict, steps: list, objections: list) -> ScriptSet:

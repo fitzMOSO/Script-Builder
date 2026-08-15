@@ -268,8 +268,10 @@ def duplicate_step(set_id: int, step_id: int, db: Session = Depends(get_db)) -> 
 def delete_step(set_id: int, step_id: int, db: Session = Depends(get_db)) -> None:
     script_set = _get_set(db, set_id)
     step = _get_step(db, set_id, step_id)
-    # The FK has no ON DELETE action (MSSQL rejects the second cascade path),
-    # so unpin any objection attached to this step before removing it.
+    # Unpin any objection attached to this step before removing it. The FK is
+    # ON DELETE SET NULL, but that only rewrites rows on disk — these objection
+    # objects are already loaded in this Session and would otherwise keep a
+    # stale `step_id` pointing at a step that no longer exists.
     for objection in script_set.objections:
         if objection.step_id == step_id:
             objection.step_id = None

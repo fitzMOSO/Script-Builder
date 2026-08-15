@@ -10,21 +10,11 @@
   ],
   "tasks": [
     {
-      "label": "db: bootstrap (create + migrate + seed)",
-      "detail": "One-shot setup: creates ScriptBuilder, applies migrations, loads campaign data.",
+      "label": "db: bootstrap (migrate + seed)",
+      "detail": "One-shot setup: creates backend/scriptbuilder.db, applies migrations, loads sample data.",
       "dependsOrder": "sequence",
-      "dependsOn": ["db: create database", "db: migrate (upgrade head)", "db: reset + seed data"],
+      "dependsOn": ["db: migrate (upgrade head)", "db: reset + seed data"],
       "group": { "kind": "build", "isDefault": true },
-      "problemMatcher": []
-    },
-    {
-      "label": "db: create database",
-      "detail": "Creates the ScriptBuilder database on LocalDB if it does not exist.",
-      "type": "shell",
-      "command": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
-      "args": ["scripts/create_db.py"],
-      "options": { "cwd": "${workspaceFolder}/backend" },
-      "presentation": { "reveal": "always", "panel": "dedicated" },
       "problemMatcher": []
     },
     {

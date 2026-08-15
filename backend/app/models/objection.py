@@ -16,11 +16,19 @@ class Objection(Base):
     # Optional: the step this objection typically comes up at, so the run view
     # can surface it in context. NULL means "can come up at any point".
     #
-    # No ON DELETE action on purpose — script_steps already cascades from
-    # script_sets, and a second cascade path into objections is rejected by
-    # MSSQL. delete_step() clears this column explicitly instead.
+    # ON DELETE SET NULL: losing the step must not take the objection with it.
+    # The pushback is still real, it just no longer has a home step.
+    #
+    # This previously had no ON DELETE action at all — script_steps already
+    # cascades from script_sets, and SQL Server rejects a second cascade path
+    # into the same table. SQLite has no such restriction, so the constraint
+    # can now say what was always meant.
+    #
+    # `delete_step()` still clears the column explicitly rather than leaning on
+    # this. The constraint only fixes rows on disk; objections already loaded
+    # into the open Session would keep a stale `step_id` until refreshed.
     step_id: Mapped[int | None] = mapped_column(
-        ForeignKey("script_steps.id"), nullable=True, index=True
+        ForeignKey("script_steps.id", ondelete="SET NULL"), nullable=True, index=True
     )
     severity: Mapped[str] = mapped_column(String(20), nullable=False, default="MAJOR")
     title: Mapped[str] = mapped_column(String(200), nullable=False)

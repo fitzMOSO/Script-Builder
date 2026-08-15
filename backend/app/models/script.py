@@ -7,11 +7,22 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
+# UTC now, as the database computes it.
+#
+# `func.now()` compiles to CURRENT_TIMESTAMP under SQLite, which is UTC and has
+# whole-second resolution. That resolution is the thing to remember: rows
+# written in the same second share a timestamp, so never order by `created_at`
+# alone where sequence matters — use `id`, or `(created_at, id)`. Script set
+# versions are ordered by `version`, so this only affects display.
+UTC_NOW = func.now()
+
+
 class JsonDict(TypeDecorator):
     """A dict stored as JSON text.
 
-    MSSQL has no native JSON column type — it stores JSON in NVARCHAR(MAX) —
-    so this keeps the Python side a plain dict without a driver-specific type.
+    Deliberately TEXT rather than a native JSON column: it keeps the schema
+    portable and the Python side always a plain dict. SQLite's JSON1 functions
+    still work against TEXT if a query ever needs to reach inside the document.
     """
 
     impl = Text
@@ -42,13 +53,13 @@ class ScriptSet(Base):
     # {"daily_benefit": "5,000"}. Without these an agent reads the raw token.
     variable_values: Mapped[dict] = mapped_column(JsonDict, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.sysutcdatetime()
+        DateTime, nullable=False, server_default=UTC_NOW
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        server_default=func.sysutcdatetime(),
-        onupdate=func.sysutcdatetime(),
+        server_default=UTC_NOW,
+        onupdate=UTC_NOW,
     )
 
     steps: Mapped[list["ScriptStep"]] = relationship(
@@ -89,7 +100,7 @@ class ScriptSetVersion(Base):
     note: Mapped[str | None] = mapped_column(String(500))
     snapshot: Mapped[dict] = mapped_column(JsonDict, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.sysutcdatetime()
+        DateTime, nullable=False, server_default=UTC_NOW
     )
 
     script_set: Mapped["ScriptSet"] = relationship(back_populates="versions")

@@ -29,15 +29,15 @@ Run these two, in order:
    Installs backend packages from `requirements.txt` and frontend packages via npm.
    Skip if `backend/.venv` and `frontend/node_modules` already exist.
 
-2. **`Ctrl+Shift+B`** (the default build task) → **`db: bootstrap (create + migrate + seed)`**
-   Runs three steps in sequence:
+2. **`Ctrl+Shift+B`** (the default build task) → **`db: bootstrap (migrate + seed)`**
+   Runs two steps in sequence:
    | Step | Effect |
    | --- | --- |
-   | `db: create database` | Creates `ScriptBuilder` on LocalDB. No-op if it exists. |
-   | `db: migrate (upgrade head)` | Applies all Alembic migrations. No-op if current. |
-   | `db: reset + seed data` | **Wipes** all script data and reloads from the campaign docs. |
+   | `db: migrate (upgrade head)` | Creates `backend/scriptbuilder.db` and applies all Alembic migrations. No-op if current. |
+   | `db: reset + seed data` | **Wipes** all script data and reloads the demo sets. |
 
-All three are safe to re-run.
+Both are safe to re-run. There is no "create database" step — SQLite creates the
+file on first connection.
 
 Then press **`F5`**.
 
@@ -162,27 +162,31 @@ backend's CORS allowlist does **not** need the phone's address.
 
 ## Troubleshooting
 
-### "Cannot connect to the database"
+### "no such table" / the app starts but every list is empty
 
-This project uses **LocalDB**, not the default SQL Server instance:
+The database is a plain SQLite file at `backend/scriptbuilder.db`, created by
+`alembic upgrade head`. There is no server to connect to, so the usual failure is not a
+connection problem — it is that migrations never ran, or ran against a different file.
 
-```
-(localdb)\MSSQLLocalDB
-```
-
-Check it's alive:
+Rebuild it from scratch:
 
 ```
-sqllocaldb info MSSQLLocalDB
+Run Task → db: bootstrap (migrate + seed)
 ```
 
-It auto-starts on connection, so it rarely needs intervention. If it reports stopped:
-`sqllocaldb start MSSQLLocalDB`.
+If you suspect two files, check where it actually is:
 
-> **This machine also has a default `MSSQLSERVER` instance installed, and it does not
-> work** — it fails to start with *service specific error 17051* (expired evaluation
-> licence). Do not point `backend/.env` at `localhost`; it will not connect. This is a
-> pre-existing condition of the machine, unrelated to this project.
+```
+cd backend
+.venv/Scripts/python.exe -c "from app.config import get_settings; print(get_settings().database_url)"
+```
+
+The default path is resolved from the `backend/` package directory, not the current
+working directory, precisely so `alembic` and `uvicorn` cannot disagree about it. You
+only get a second file by overriding `DATABASE_URL` with a relative path in `.env`.
+
+Deleting `backend/scriptbuilder.db` is always safe — it is gitignored and fully
+rebuildable from the two commands above. Anything you authored in the UI goes with it.
 
 ### The backend debugger doesn't stop at breakpoints
 
@@ -207,14 +211,19 @@ is not.
 
 ### Editing `backend/.env`
 
-The server value contains a backslash:
+You almost certainly don't need to. Every setting has a working default in
+`app/config.py`, and `.env` is optional — see `backend/.env.example` for what exists.
+
+If you do set `DATABASE_URL`, note it takes **three** slashes for a relative path and
+**four** for an absolute one:
 
 ```
-MSSQL_SERVER=(localdb)\MSSQLLocalDB
+DATABASE_URL=sqlite:///./scriptbuilder.db          # relative to the working directory
+DATABASE_URL=sqlite:////c/data/scriptbuilder.db    # absolute
 ```
 
-Keep it as a single backslash and don't quote it. Editing this file with `sed` will
-silently eat the backslash — edit it in the editor.
+A relative path resolves against wherever the process started, which is how you end up
+migrating one file and serving another.
 
 ---
 
@@ -231,6 +240,6 @@ silently eat the backslash — edit it in the editor.
         └────── proxy /api ─────────────┘
                                         │
                                         ▼
-                          (localdb)\MSSQLLocalDB
-                              ScriptBuilder
+                              SQLite (a file)
+                       backend/scriptbuilder.db
 ```
