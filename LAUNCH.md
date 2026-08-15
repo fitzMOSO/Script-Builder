@@ -15,6 +15,7 @@ the underlying commands by hand.
 | Run the app without debugging | `Ctrl+Shift+P` → *Run Task* → **dev: backend + frontend** |
 | Wipe and reload the campaign data | *Run Task* → **db: reset + seed data** |
 | Add a column / change a model | *Run Task* → **db: new migration**, review, then **db: migrate** |
+| Run exactly what production runs | *Run Task* → **docker: build & run (production image)** |
 
 Ports: backend **8000**, frontend **5173**. The frontend proxies `/api` → `127.0.0.1:8000`,
 so you always browse to <http://localhost:5173>.
@@ -108,6 +109,22 @@ tasks, which are faster.
 | `backend: dev server` | FastAPI with autoreload on 8000. |
 | `frontend: dev server` | Vite on 5173. |
 
+### Docker (production image)
+
+| Task | What it does |
+| --- | --- |
+| `docker: build & run (production image)` | Builds and runs the image Render deploys. App + API on **8000**. |
+| `docker: stop` | Stops and removes the container. Keeps the database volume. |
+| `docker: stop + wipe database volume` | **Destructive.** Also deletes the volume, so the next run reseeds. |
+
+Equivalent by hand, from the repo root:
+
+```bash
+docker compose up --build     # build and run, logs in the foreground
+docker compose down           # stop
+docker compose down -v        # stop and delete the database volume
+```
+
 ### Build & setup
 
 | Task | What it does |
@@ -149,6 +166,62 @@ backend's CORS allowlist does **not** need the phone's address.
 
 ---
 
+## Running the production image
+
+**Run Task → `docker: build & run (production image)`**, then browse to
+<http://localhost:8000>.
+
+This builds [Dockerfile](Dockerfile) — the same one Render builds — via
+[docker-compose.yml](docker-compose.yml). It is how you check a deployment
+before pushing it, not how you develop day to day: there is no hot reload, no
+debugger and no source maps, and every code change needs a full rebuild.
+
+The shape is different from `F5` in ways that matter:
+
+| | `F5` / dev tasks | Docker |
+| --- | --- | --- |
+| Browse to | `localhost:5173` | `localhost:8000` |
+| Frontend served by | Vite, from source | FastAPI, from a static build |
+| `/api` reaches the backend via | Vite's proxy | nothing — same origin |
+| CORS | allowlist includes `:5173` | empty; no cross-origin request exists |
+| Database file | `backend/scriptbuilder.db` | `/data/scriptbuilder.db` in a volume |
+| Code changes | hot reload | `docker compose up --build` again |
+
+```
+                 docker compose up
+                        │
+                        ▼
+              uvicorn  :8000   ── serves /api/*
+                                └─ serves the built SPA for everything else
+                        │
+                        ▼
+              SQLite (a file, in a named volume)
+                  /data/scriptbuilder.db
+```
+
+### Why the database lives at `/data`
+
+The container's code is at `/app`, and a Docker volume mounted over a directory
+**hides whatever the image had there**. Mounting the volume at `/app/backend`
+to persist the default `scriptbuilder.db` would therefore erase
+`/app/backend/app` from the container's view, and the app would fail to import.
+So `DATABASE_URL` points at `/data` instead, which overlaps nothing.
+
+Note the four slashes in `sqlite:////data/scriptbuilder.db`. Three means a path
+relative to the working directory; four means absolute. Three would put the
+file inside the container's writable layer instead of the volume, and it would
+disappear on `docker compose down`.
+
+### First boot takes a moment
+
+The entrypoint runs `alembic upgrade head`, seeds the database if it is empty,
+and only then starts uvicorn. Wait for `Application startup complete` in the
+task terminal — requests before that get connection refused.
+
+Seeding happens **only when the database is empty**, so anything you author in
+the containerised app survives a restart. `docker compose down -v` deletes the
+volume and gets you a clean reseeded database.
+
 ## Changing the data model
 
 1. Edit the models in `backend/app/models/`.
@@ -187,6 +260,29 @@ only get a second file by overriding `DATABASE_URL` with a relative path in `.en
 
 Deleting `backend/scriptbuilder.db` is always safe — it is gitignored and fully
 rebuildable from the two commands above. Anything you authored in the UI goes with it.
+
+### `docker compose` fails to connect to the Docker API
+
+```
+failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine
+```
+
+Docker Desktop is installed but not running. Start it and wait for the whale
+icon in the tray to stop animating — the CLI is available before the engine is,
+so a command run too early fails this way even though Docker is "open".
+
+### The container starts, but the app is empty
+
+Check the task terminal for the entrypoint's output. `==> empty database,
+seeding` means it seeded; `==> database already has script sets, skipping seed`
+means the volume already had data. If you expected a fresh start, run
+**`docker: stop + wipe database volume`** and launch again.
+
+### A code change didn't appear
+
+There is no hot reload in the container — the frontend is a static build baked
+into the image at build time. Re-run **`docker: build & run`**, which passes
+`--build`. Plain `docker compose up` reuses the existing image.
 
 ### The backend debugger doesn't stop at breakpoints
 

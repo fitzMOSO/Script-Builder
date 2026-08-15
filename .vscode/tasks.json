@@ -132,6 +132,44 @@
       "problemMatcher": []
     },
     {
+      "label": "docker: build & run (production image)",
+      "detail": "Builds and runs the same image Render deploys. Serves app + API together on http://localhost:8000.",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "up", "--build"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "docker" },
+      "problemMatcher": {
+        "pattern": [{ "regexp": ".", "file": 1, "location": 2, "message": 3 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*(Building|Container script-builder).*",
+          "endsPattern": ".*Application startup complete.*"
+        }
+      }
+    },
+    {
+      "label": "docker: stop",
+      "detail": "Stops and removes the container. The database volume is kept.",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "down"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "docker" },
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: stop + wipe database volume",
+      "detail": "DESTRUCTIVE. Stops the container and deletes the volume, so the next run reseeds from scratch.",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "down", "--volumes"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "docker" },
+      "problemMatcher": []
+    },
+    {
       "label": "setup: install all dependencies",
       "detail": "Installs backend (pip) and frontend (npm) dependencies.",
       "dependsOrder": "sequence",

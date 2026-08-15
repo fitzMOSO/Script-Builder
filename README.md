@@ -175,6 +175,7 @@ browser never makes a cross-origin request.
 | `Dockerfile` | Two stages: Node builds the SPA, Python runs FastAPI and serves `frontend/dist` |
 | `.dockerignore` | Keeps host artefacts (`node_modules`, `.venv`, `*.db`, `.env`) out of the image |
 | `render.yaml` | Blueprint: Docker runtime, free plan, health check on `/api/health` |
+| `docker-compose.yml` | Runs that same image locally — `docker compose up --build`, then <http://localhost:8000> |
 | `backend/scripts/render-start.sh` | Entrypoint: `alembic upgrade head`, seed if empty, then `exec uvicorn` |
 
 Why Docker rather than Render's native Python runtime: Vite needs Node to build

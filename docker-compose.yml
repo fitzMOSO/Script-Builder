@@ -1,0 +1,82 @@
+# Runs the production image locally — the same Dockerfile Render builds, so
+# this is how you verify a deployment before pushing it.
+#
+#   docker compose up --build      build and run, logs in the foreground
+#   docker compose down            stop and remove the container
+#   docker compose down -v         ...and delete the database volume
+#
+# Then browse to http://localhost:8000 — one origin serves both the app and the
+# API, exactly as in production. There is no :5173 here and no Vite proxy; the
+# frontend is a static build baked into the image. For day-to-day development
+# use `F5` / the dev tasks instead, which give you hot reload and debugging.
+#
+# No `version:` key: Compose V2 ignores it and warns that it is obsolete.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: script-builder:local
+    container_name: script-builder
+
+    ports:
+      # host:container. Change only the left number if 8000 is taken locally —
+      # the right one must match PORT below, which is what uvicorn binds.
+      - "8000:8000"
+
+    environment:
+      PORT: "8000"
+
+      # The database is deliberately moved OFF the code path and onto the
+      # volume below.
+      #
+      # The obvious approach — mounting a volume at /app/backend so the default
+      # scriptbuilder.db persists — silently breaks the container: a volume
+      # mounted over a directory HIDES the image's contents at that path, so
+      # /app/backend/app would vanish and the import of app.main would fail.
+      # Pointing the URL at a dedicated /data avoids overlapping the code at
+      # all.
+      #
+      # Four slashes, not three: `sqlite:///` is relative to the working
+      # directory, `sqlite:////` is an absolute path. Three here would create
+      # the file at /app/backend/data..., outside the volume, and it would be
+      # lost on `down`.
+      DATABASE_URL: "sqlite:////data/scriptbuilder.db"
+
+      # Same origin serves the app and the API, so no cross-origin request is
+      # ever made and the allowlist is empty. Left explicit so the development
+      # default (http://localhost:5173) does not apply here — this container is
+      # meant to behave like production, including its CORS posture.
+      CORS_ORIGINS: ""
+
+      # Uncomment to see every SQL statement uvicorn executes.
+      # DATABASE_ECHO: "true"
+
+    volumes:
+      # Named volume, not a bind mount: a bind mount of a Windows directory
+      # into a Linux container gives SQLite a filesystem whose locking
+      # semantics it cannot rely on, which surfaces as sporadic "database is
+      # locked" errors rather than a clean failure.
+      - script-builder-data:/data
+
+    # `python -c`, not curl or wget — neither is installed in python:3.13-slim,
+    # and a healthcheck whose command is missing reports unhealthy forever,
+    # which looks exactly like a broken app.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          with urllib.request.urlopen("http://127.0.0.1:8000/api/health", timeout=3) as r:
+              sys.exit(0 if r.status == 200 else 1)
+      interval: 10s
+      timeout: 5s
+      # Generous: the first boot runs migrations and seeds before uvicorn binds.
+      start_period: 40s
+      retries: 3
+
+volumes:
+  script-builder-data:
