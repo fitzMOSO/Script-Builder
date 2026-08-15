@@ -1,0 +1,41 @@
+# Render blueprint. One web service serving the API and the SPA from a single
+# origin — see Dockerfile for why it is one service and not two.
+#
+# To deploy: Render dashboard > New > Blueprint, point it at this repo, and
+# authorise access (the repo is private, so Render needs the GitHub connection).
+services:
+  - type: web
+    name: script-builder
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    branch: main
+
+    # Cheap, unauthenticated, and it touches no database — exactly what a
+    # health check should be. Render polls this to decide the deploy is live.
+    healthCheckPath: /api/health
+
+    envVars:
+      # Same origin serves the app and the API, so the browser never makes a
+      # cross-origin request and this list is only here to stop the default
+      # (http://localhost:5173) leaking into production config.
+      - key: CORS_ORIGINS
+        value: ""
+
+# NOTE ON PERSISTENCE
+#
+# The free plan has no disk, so backend/scriptbuilder.db lives in the
+# container's ephemeral filesystem: every deploy starts from an empty database
+# and render-start.sh reseeds it. Edits made in the deployed app survive
+# restarts within a deploy but not across deploys. That is fine for a demo.
+#
+# To make it durable, upgrade off the free plan and add:
+#
+#   disks:
+#     - name: data
+#       mountPath: /app/backend
+#       sizeGB: 1
+#
+# render-start.sh already seeds only when the database is empty, so no code
+# change is needed.

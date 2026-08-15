@@ -1,0 +1,10 @@
+# Files that a Linux container executes or parses must check out with LF
+# endings regardless of the developer's platform. A shell script checked out
+# with CRLF fails at exec — the shebang becomes "/bin/sh\r", which does not
+# exist, and the error ("no such file or directory") names a path that plainly
+# does exist, so it is a genuinely confusing failure.
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

@@ -162,3 +162,45 @@ agent can see the gap rather than read the token aloud.
 | GET | `/api/categories` | Step category options |
 | GET | `/api/severities` | Objection severity options |
 | GET | `/api/health` | Health check |
+
+## Deployment
+
+Deployed to [Render](https://render.com) as a **single web service** that serves
+both the API and the built frontend from one origin. That is why the frontend
+calls relative `/api/...` paths and why CORS needs no production entry — the
+browser never makes a cross-origin request.
+
+| File | Role |
+| --- | --- |
+| `Dockerfile` | Two stages: Node builds the SPA, Python runs FastAPI and serves `frontend/dist` |
+| `.dockerignore` | Keeps host artefacts (`node_modules`, `.venv`, `*.db`, `.env`) out of the image |
+| `render.yaml` | Blueprint: Docker runtime, free plan, health check on `/api/health` |
+| `backend/scripts/render-start.sh` | Entrypoint: `alembic upgrade head`, seed if empty, then `exec uvicorn` |
+
+Why Docker rather than Render's native Python runtime: Vite needs Node to build
+the frontend, and a Python runtime has no Node. Two services would mean two
+origins, CORS configuration and a second cold start.
+
+**To deploy:** Render dashboard → New → Blueprint → point it at this repo. The
+repo is private, so Render needs GitHub access authorised.
+
+### Data persistence
+
+The free plan has no persistent disk, so `backend/scriptbuilder.db` lives in the
+container's ephemeral filesystem. Every *deploy* starts from an empty database
+that `render-start.sh` reseeds; edits survive restarts within a deploy but not
+across deploys. Fine for a demo.
+
+The seed step runs **only when the database is empty** — `seed.py` wipes all
+script data, so running it on every boot would discard visitor edits whenever a
+free instance woke from idle. To make data durable, add a disk mounted at
+`/app/backend` (see the commented block in `render.yaml`); no code change is
+needed.
+
+### Serving the SPA locally
+
+`backend/app/main.py` registers its static routes only when `frontend/dist`
+exists, so local development is unaffected — Vite serves the app on `:5173` and
+proxies `/api` to `:8000`. If you have run `npm run build`, the backend will
+also serve that build on `:8000`, which is a quick way to check the production
+serving path without Docker.
