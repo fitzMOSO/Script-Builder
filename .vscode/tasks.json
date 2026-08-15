@@ -1,0 +1,168 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "migrationMessage",
+      "type": "promptString",
+      "description": "Alembic migration message",
+      "default": "schema change"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "db: bootstrap (create + migrate + seed)",
+      "detail": "One-shot setup: creates ScriptBuilder, applies migrations, loads campaign data.",
+      "dependsOrder": "sequence",
+      "dependsOn": ["db: create database", "db: migrate (upgrade head)", "db: reset + seed data"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "db: create database",
+      "detail": "Creates the ScriptBuilder database on LocalDB if it does not exist.",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+      "args": ["scripts/create_db.py"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "db: migrate (upgrade head)",
+      "detail": "Applies all pending Alembic migrations.",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/alembic.exe",
+      "args": ["upgrade", "head"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "db: reset + seed data",
+      "detail": "WIPES all script data and reseeds from the campaign documents. Ids restart at 0.",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+      "args": ["scripts/seed.py"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "db: new migration (autogenerate)",
+      "detail": "Generates a migration from model changes. Review it before applying.",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/alembic.exe",
+      "args": ["revision", "--autogenerate", "-m", "${input:migrationMessage}"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "db: downgrade one revision",
+      "detail": "Rolls back the most recent migration.",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/alembic.exe",
+      "args": ["downgrade", "-1"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: dev server",
+      "detail": "Runs FastAPI with autoreload on port 8000.",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/uvicorn.exe",
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "servers" },
+      "problemMatcher": {
+        "pattern": [{ "regexp": ".", "file": 1, "location": 2, "message": 3 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*Started reloader.*",
+          "endsPattern": ".*Application startup complete.*"
+        }
+      }
+    },
+    {
+      "label": "frontend: dev server",
+      "detail": "Runs the Vite dev server on port 5173.",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "servers" },
+      "problemMatcher": {
+        "pattern": [{ "regexp": ".", "file": 1, "location": 2, "message": 3 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*VITE.*",
+          "endsPattern": ".*ready in.*"
+        }
+      }
+    },
+    {
+      "label": "dev: backend + frontend",
+      "detail": "Starts both dev servers side by side.",
+      "dependsOrder": "parallel",
+      "dependsOn": ["backend: dev server", "frontend: dev server"],
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: build",
+      "detail": "Typechecks and builds the production bundle.",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "build"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "frontend: preview (test PWA)",
+      "detail": "Builds, then serves the production bundle. Service workers only run here, not in dev.",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "preview", "--", "--host"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "dependsOn": ["frontend: build"],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "assets: regenerate PWA icons",
+      "detail": "Redraws public/icons/*.png from scripts/generate-icons.py.",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+      "args": ["scripts/generate-icons.py"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "setup: install all dependencies",
+      "detail": "Installs backend (pip) and frontend (npm) dependencies.",
+      "dependsOrder": "sequence",
+      "dependsOn": ["setup: install backend deps", "setup: install frontend deps"],
+      "problemMatcher": []
+    },
+    {
+      "label": "setup: install backend deps",
+      "type": "shell",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+      "args": ["-m", "pip", "install", "-r", "requirements.txt"],
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "setup: install frontend deps",
+      "type": "shell",
+      "command": "npm",
+      "args": ["install"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    }
+  ]
+}
