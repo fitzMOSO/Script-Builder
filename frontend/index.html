@@ -21,27 +21,8 @@
 
     <title>Script Builder</title>
 
-    <!--
-      Link preview (Open Graph + Twitter Card).
-
-      Static HTML, not set from React: Facebook, LinkedIn, Slack, iMessage,
-      WhatsApp and Discord all read the served HTML WITHOUT executing
-      JavaScript, so tags applied at runtime are invisible to every one of them.
-
-      Absolute URLs are required rather than preferred — `og:image` and
-      `og:url` are specified absolute, and most crawlers drop a relative path
-      silently instead of resolving it. That hardcodes the deployed host here.
-
-      This app is served by its own FastAPI process out of the Docker image
-      (there is no separate static host), and the domain only resolves while
-      `script-builder.fitzdev.studio` stays registered under the Render
-      service's Custom Domains — Render matches on the Host header, so
-      unregistering it 404s these URLs even though DNS still resolves.
-
-      The card is generated in the portfolio repo
-      (`frontend/scripts/generate-og.mjs`) and copied here, so every FitzDev
-      property shares one visual system rather than drifting per repo.
-    -->
+    <!-- Link preview. Static HTML: crawlers don't run JS. og:image must be an absolute PNG URL. -->
+    <!-- The hardcoded host only resolves while script-builder.fitzdev.studio stays in the Render service's Custom Domains — Render routes on the Host header. -->
     <link rel="canonical" href="https://script-builder.fitzdev.studio/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="FitzDev Studio" />
@@ -55,9 +36,7 @@
       property="og:image"
       content="https://script-builder.fitzdev.studio/og.png"
     />
-    <!-- Dimensions let a client reserve the right box before the image lands —
-         the difference between a full-size card and one that collapses to a
-         thumbnail on a slow first fetch. -->
+    <!-- Dimensions let a client reserve the full-size card box before the image lands. -->
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
