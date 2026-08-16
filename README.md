@@ -2,6 +2,10 @@
 
 Call-centre script authoring tool — build ordered, versioned call scripts with merge variables.
 
+> **Portfolio demo, not open source.** The code is published so it can be read as a
+> work sample, and cloned to run the demo locally. It is not offered for reuse.
+> See [LICENSE](LICENSE).
+
 ## Stack
 
 | Layer    | Technology                                     |
@@ -11,11 +15,13 @@ Call-centre script authoring tool — build ordered, versioned call scripts with
 | Alerts   | SweetAlert2 (confirm modals + toasts)          |
 | State    | Zustand                                        |
 | Forms    | React Hook Form + Zod                          |
-| Backend  | Python 3.14 + FastAPI                          |
+| Backend  | Python 3.11+ + FastAPI (image pins 3.13)       |
 | ORM      | SQLAlchemy 2.0                                 |
 | Database | SQLite (no server to install)                  |
 | Migrations | Alembic                                      |
 | PWA      | vite-plugin-pwa (Workbox `generateSW`)         |
+
+Full detail, with exact pins, in [STACK.md](STACK.md).
 
 > Working in VS Code? See **[LAUNCH.md](LAUNCH.md)** — press `Ctrl+Shift+B` to set up the
 > database and `F5` to run both servers with debugging. The commands below are the manual
@@ -205,3 +211,11 @@ exists, so local development is unaffected — Vite serves the app on `:5173` an
 proxies `/api` to `:8000`. If you have run `npm run build`, the backend will
 also serve that build on `:8000`, which is a quick way to check the production
 serving path without Docker.
+
+---
+
+## License
+
+**Portfolio demo, not open source.** You may read the code and clone it to run the
+demo locally in order to evaluate the work. Any other use requires written
+permission. See [LICENSE](LICENSE).
